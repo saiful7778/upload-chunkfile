@@ -1,8 +1,8 @@
 {
-  "name": "chunkfile-upload",
+  "name": "upload-chunkfile",
   "version": "0.0.1",
   "description": "This is a file upload library as chunk size.",
-  "homepage": "https://github.com/saiful7778/chunkfile-upload",
+  "homepage": "https://github.com/saiful7778/upload-chunkfile",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -20,10 +20,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/saiful7778/chunkfile-upload"
+    "url": "git+https://github.com/saiful7778/upload-chunkfile"
   },
   "bugs": {
-    "url": "https://github.com/saiful7778/chunkfile-upload/issues"
+    "url": "https://github.com/saiful7778/upload-chunkfile/issues"
   },
   "author": "Saiful Islam",
   "license": "MIT",
