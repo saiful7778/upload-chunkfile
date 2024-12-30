@@ -45,7 +45,7 @@ export default async function uploadFile({
     } else if (uploadType === "single") {
       return uploadFileInner({
         method,
-        file,
+        chunk: file,
         uploadUrl,
         onProgressChange,
         signal,
@@ -97,7 +97,10 @@ async function multipartUpload({
   }) => {
     const eTag = await uploadFileInner({
       method,
-      file: chunk,
+      chunk,
+      currentChunk: part.partNumber,
+      totalChunk: totalParts,
+      filename: file.name,
       uploadUrl,
       signal,
       onProgressChange: (progress) => {
@@ -160,13 +163,16 @@ function generateMultipartInfo(file: File, partSize: number) {
 }
 
 async function uploadFileInner(props: {
-  file: File | Blob;
+  chunk: File | Blob;
+  filename?: string | undefined;
+  currentChunk?: number | undefined;
+  totalChunk?: number | undefined;
   uploadUrl: string;
   method: Method;
   onProgressChange?: OnProgressChangeHandler;
   signal?: AbortSignal;
 }) {
-  const { file, uploadUrl, onProgressChange, method, signal } = props;
+  const { chunk, uploadUrl, onProgressChange, method, signal } = props;
 
   return new Promise<{ eTag: string | null; response: unknown }>(
     (resolve, reject) => {
@@ -214,7 +220,19 @@ async function uploadFileInner(props: {
         });
       }
 
-      request.send(file);
+      const formData = new FormData();
+      formData.append("chunk", chunk);
+      if (props?.filename) {
+        formData.append("filename", props?.filename);
+      }
+      if (props?.currentChunk) {
+        formData.append("currentChunk", props?.currentChunk.toString());
+      }
+      if (props?.totalChunk) {
+        formData.append("totalChunk", props?.totalChunk.toString());
+      }
+
+      request.send(formData);
     }
   );
 }
