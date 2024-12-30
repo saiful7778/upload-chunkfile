@@ -88,12 +88,10 @@ export default class UploadChunkFile {
     // Calculate details like part size and total parts
     const { partSize, parts, totalParts } = this.calculateMultipartDetails(
       file,
-      this.multipartOptions.chunkSize
+      this.multipartOptions.chunkSize!
     );
 
     const uploadProgress: Map<number, number> = new Map(); // Track progress for each part
-
-    const eTags: string[] = []; // Collect ETags for all parts
 
     // Function to upload a single part
     const uploadPart = async ({
@@ -103,7 +101,7 @@ export default class UploadChunkFile {
       partNumber: number;
       chunk: Blob;
     }): Promise<void> => {
-      const { eTag } = await this.singleFileUpload({
+      await this.singleFileUpload({
         file: chunk,
         uploadUrl,
         method,
@@ -119,11 +117,6 @@ export default class UploadChunkFile {
           this.onProgressChange?.(totalProgress / totalParts); // Update overall progress
         },
       });
-
-      if (!eTag) {
-        throw new FileUploadError("Missing ETag in response");
-      }
-      eTags[partNumber - 1] = eTag; // Store ETag for the part
     };
 
     // Process all parts in parallel batches
@@ -138,9 +131,11 @@ export default class UploadChunkFile {
       uploadPart
     );
 
+    // Return a meaningful response after all parts are uploaded
     return {
-      eTag: null, // You can update this logic if a consolidated ETag is needed
-      response: { eTags } as T, // Ensure response type matches your generic type
+      response: {
+        message: "File uploaded successfully",
+      } as T,
     };
   }
 
@@ -171,42 +166,37 @@ export default class UploadChunkFile {
     totalChunk?: number;
     onProgressChange?: OnProgressChangeHandler;
   }): Promise<UploadResponse<T>> {
-    return new Promise<{ eTag: string | null; response: T }>(
-      (resolve, reject) => {
-        if (this.signal?.aborted) {
-          reject(new UploadAbortedError("File upload aborted"));
-          return;
-        }
-
-        const request = new XMLHttpRequest();
-        request.open(method, uploadUrl);
-
-        // Setup event handlers for request
-        this.setupRequestHandlers({
-          request,
-          onProgressChange,
-          resolve,
-          reject,
-        });
-
-        // Create FormData payload
-        const formData = new FormData();
-        formData.append(this.payloadOptions.chunkName, file);
-        if (filename) formData.append(this.payloadOptions.filename, filename);
-        if (currentChunk)
-          formData.append(
-            this.payloadOptions.currentChunk,
-            currentChunk.toString()
-          );
-        if (totalChunk)
-          formData.append(
-            this.payloadOptions.totalChunk,
-            totalChunk.toString()
-          );
-
-        request.send(formData); // Send the request
+    return new Promise<{ response: T }>((resolve, reject) => {
+      if (this.signal?.aborted) {
+        reject(new UploadAbortedError("File upload aborted"));
+        return;
       }
-    );
+
+      const request = new XMLHttpRequest();
+      request.open(method, uploadUrl);
+
+      // Setup event handlers for request
+      this.setupRequestHandlers({
+        request,
+        onProgressChange,
+        resolve,
+        reject,
+      });
+
+      // Create FormData payload
+      const formData = new FormData();
+      formData.append(this.payloadOptions.chunkName!, file);
+      if (filename) formData.append(this.payloadOptions.filename!, filename);
+      if (currentChunk)
+        formData.append(
+          this.payloadOptions.currentChunk!,
+          currentChunk.toString()
+        );
+      if (totalChunk)
+        formData.append(this.payloadOptions.totalChunk!, totalChunk.toString());
+
+      request.send(formData); // Send the request
+    });
   }
 
   // Setup event handlers for XMLHttpRequest
@@ -218,11 +208,7 @@ export default class UploadChunkFile {
   }: {
     request: XMLHttpRequest;
     onProgressChange?: OnProgressChangeHandler;
-    resolve: (
-      value:
-        | { eTag: string | null; response: T }
-        | PromiseLike<{ eTag: string | null; response: T }>
-    ) => void;
+    resolve: (value: { response: T } | PromiseLike<{ response: T }>) => void;
     reject: (reason?: any) => void;
   }) {
     // Track upload progress
@@ -235,10 +221,9 @@ export default class UploadChunkFile {
 
     // Handle successful response
     request.addEventListener("load", () => {
-      const eTag = request.getResponseHeader("ETag");
       if (request.status >= 200 && request.status < 300) {
-        resolve({ eTag, response: JSON.parse(request.responseText) });
-        return { eTag: eTag, response: JSON.parse(request.response) };
+        resolve({ response: JSON.parse(request.responseText) });
+        return { response: JSON.parse(request.response) };
       } else {
         reject(new FileUploadError(`HTTP ${request.status}`));
       }
@@ -264,12 +249,15 @@ export default class UploadChunkFile {
   private async processInBatches<TItem, TResult>(
     items: TItem[],
     processFn: (item: TItem) => Promise<TResult>
-  ) {
-    const results: TResult[] = [];
+  ): Promise<TResult[]> {
+    const results: TResult[] = Array(items.length).fill(
+      undefined as unknown as TResult
+    );
+
     const tasks = items.map(async (item, index) => {
       for (
         let attempt = 0;
-        attempt <= this.multipartOptions.maxRetries;
+        attempt <= this.multipartOptions.maxRetries!;
         attempt++
       ) {
         try {
@@ -279,7 +267,7 @@ export default class UploadChunkFile {
           if (attempt === this.multipartOptions.maxRetries) {
             throw error; // Fail after max retries
           }
-          await delay(this.multipartOptions.retryDelay); // Wait before retrying
+          await delay(this.multipartOptions.retryDelay!); // Wait before retrying
         }
       }
     });

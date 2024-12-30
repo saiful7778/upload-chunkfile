@@ -4,27 +4,26 @@ export type Method = "POST" | "PUT" | "PATCH";
 export type UploadType = "multipart" | "single";
 
 export type UploadResponse<T> = {
-  eTag: string | null;
   response: T;
 };
 
 export type PayloadOptions = {
-  chunkName: string;
-  filename: string;
-  currentChunk: string;
-  totalChunk: string;
+  chunkName?: string | undefined;
+  filename?: string | undefined;
+  currentChunk?: string | undefined;
+  totalChunk?: string | undefined;
 };
 
 export type MultipartOptions = {
-  chunkSize: number;
-  maxRetries: number;
-  retryDelay: number;
-  maxParallel: number;
+  chunkSize?: number | undefined;
+  maxRetries?: number | undefined;
+  retryDelay?: number | undefined;
+  maxParallel?: number | undefined;
 };
 
 export type Options = {
-  method: Method;
-  uploadType: UploadType;
-  signal: AbortSignal | undefined;
-  payloadOptions: PayloadOptions;
+  method?: Method | undefined;
+  uploadType?: UploadType | undefined;
+  signal?: AbortSignal | undefined;
+  payloadOptions?: PayloadOptions | undefined;
 } & MultipartOptions;
