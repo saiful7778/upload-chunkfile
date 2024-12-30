@@ -7,34 +7,42 @@ import type {
   MultipartOptions,
   PayloadOptions,
   UploadResponse,
+  UploadType,
 } from "./types";
 
 export default class UploadChunkFile {
-  private options: Options;
+  private options: {
+    method: Method;
+    uploadType: UploadType;
+  };
   private signal?: AbortSignal;
   private onProgressChange?: OnProgressChangeHandler;
   private payloadOptions: PayloadOptions;
   private multipartOptions: MultipartOptions;
 
   // Constructor to initialize options, signal, and default settings
-  constructor(options: Options, signal?: AbortSignal) {
-    this.options = options;
+  constructor(options?: Options, signal?: AbortSignal) {
     this.signal = signal;
+
+    this.options = {
+      method: options?.method ?? "POST",
+      uploadType: options?.uploadType ?? "multipart",
+    };
 
     // Set default values for multipart options
     this.multipartOptions = {
-      chunkSize: options.chunkSize ?? 5 * 1024 * 1024, // Default chunk size is 5MB
-      maxRetries: options.maxRetries ?? 5, // Default max retries
-      retryDelay: options.retryDelay ?? 3000, // Default retry delay in ms
-      maxParallel: options.maxParallel ?? 5, // Default max parallel uploads
+      chunkSize: options?.chunkSize ?? 5 * 1024 * 1024, // Default chunk size is 5MB
+      maxRetries: options?.maxRetries ?? 5, // Default max retries
+      retryDelay: options?.retryDelay ?? 3000, // Default retry delay in ms
+      maxParallel: options?.maxParallel ?? 5, // Default max parallel uploads
     };
 
     // Set default values for payload options
     this.payloadOptions = {
-      chunkName: options.payloadOptions?.chunkName ?? "chunk",
-      filename: options.payloadOptions?.filename ?? "filename",
-      currentChunk: options.payloadOptions?.currentChunk ?? "currentChunk",
-      totalChunk: options.payloadOptions?.totalChunk ?? "totalChunk",
+      chunkName: options?.payloadOptions?.chunkName ?? "chunk",
+      filename: options?.payloadOptions?.filename ?? "filename",
+      currentChunk: options?.payloadOptions?.currentChunk ?? "currentChunk",
+      totalChunk: options?.payloadOptions?.totalChunk ?? "totalChunk",
     };
   }
 
@@ -52,8 +60,8 @@ export default class UploadChunkFile {
       this.onProgressChange = onProgressChange;
       this.onProgressChange?.(0); // Initialize progress to 0
 
-      const uploadType = this.options.uploadType ?? "multipart"; // Default to multipart upload
-      const method = this.options.method ?? "POST"; // Default HTTP method
+      const uploadType = this.options.uploadType; // Default to multipart upload
+      const method = this.options.method; // Default HTTP method
 
       if (uploadType === "multipart") {
         return this.multipartUpload<T>({ file, uploadUrl, method }); // Multipart upload
