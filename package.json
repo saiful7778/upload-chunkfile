@@ -1,6 +1,6 @@
 {
   "name": "upload-chunkfile",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "This is a file upload library as chunk size.",
   "homepage": "https://github.com/saiful7778/upload-chunkfile",
   "main": "./dist/index.js",
@@ -12,8 +12,7 @@
   "keywords": [
     "file",
     "upload",
-    "chunk",
-    "chunk-upload"
+    "chunk"
   ],
   "files": [
     "dist"
