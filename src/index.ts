@@ -31,16 +31,16 @@ export default class UploadChunkFile {
 
     // Set default values for multipart options
     this.multipartOptions = {
-      chunkSize: options?.chunkSize ?? 5 * 1024 * 1024, // Default chunk size is 5MB
-      maxRetries: options?.maxRetries ?? 5, // Default max retries
-      retryDelay: options?.retryDelay ?? 3000, // Default retry delay in ms
-      maxParallel: options?.maxParallel ?? 5, // Default max parallel uploads
+      chunkSize: options?.chunkSize || 5 * 1024 * 1024, // Default chunk size is 5MB
+      maxRetries: options?.maxRetries || 5, // Default max retries
+      retryDelay: options?.retryDelay || 3000, // Default retry delay in ms
+      maxParallel: options?.maxParallel || 5, // Default max parallel uploads
     };
 
     // Set default values for payload options
     this.payloadOptions = {
       chunkName: options?.payloadOptions?.chunkName ?? "chunk",
-      filename: options?.payloadOptions?.filename ?? "filename",
+      fileName: options?.payloadOptions?.fileName ?? "fileName",
       currentChunk: options?.payloadOptions?.currentChunk ?? "currentChunk",
       totalChunk: options?.payloadOptions?.totalChunk ?? "totalChunk",
     };
@@ -105,7 +105,7 @@ export default class UploadChunkFile {
         file: chunk,
         uploadUrl,
         method,
-        filename: file.name,
+        fileName: file.name,
         currentChunk: partNumber,
         totalChunk: totalParts,
         onProgressChange: (progress) => {
@@ -142,9 +142,11 @@ export default class UploadChunkFile {
   // Calculate multipart upload details like part size and total parts
   private calculateMultipartDetails(file: File, partSize: number) {
     const totalParts = Math.ceil(file.size / partSize);
+
     const parts = Array.from({ length: totalParts }, (_, index) => ({
-      partNumber: index + 1,
+      partNumber: index,
     }));
+
     return { partSize, parts, totalParts };
   }
 
@@ -153,7 +155,7 @@ export default class UploadChunkFile {
     file,
     uploadUrl,
     method,
-    filename,
+    fileName,
     currentChunk,
     totalChunk,
     onProgressChange,
@@ -161,7 +163,7 @@ export default class UploadChunkFile {
     file: File | Blob;
     uploadUrl: string;
     method: Method;
-    filename?: string;
+    fileName?: string;
     currentChunk?: number;
     totalChunk?: number;
     onProgressChange?: OnProgressChangeHandler;
@@ -186,8 +188,8 @@ export default class UploadChunkFile {
       // Create FormData payload
       const formData = new FormData();
       formData.append(this.payloadOptions.chunkName!, file);
-      if (filename) formData.append(this.payloadOptions.filename!, filename);
-      if (currentChunk)
+      if (fileName) formData.append(this.payloadOptions.fileName!, fileName);
+      if (currentChunk || currentChunk === 0)
         formData.append(
           this.payloadOptions.currentChunk!,
           currentChunk.toString()
@@ -209,7 +211,7 @@ export default class UploadChunkFile {
     request: XMLHttpRequest;
     onProgressChange?: OnProgressChangeHandler;
     resolve: (value: { response: T } | PromiseLike<{ response: T }>) => void;
-    reject: (reason?: any) => void;
+    reject: (reason?: unknown) => void;
   }) {
     // Track upload progress
     request.upload.addEventListener("progress", (e) => {
@@ -219,11 +221,12 @@ export default class UploadChunkFile {
       }
     });
 
+    request.setRequestHeader("Accept", "application/json");
+
     // Handle successful response
     request.addEventListener("load", () => {
       if (request.status >= 200 && request.status < 300) {
         resolve({ response: JSON.parse(request.responseText) });
-        return { response: JSON.parse(request.response) };
       } else {
         reject(new FileUploadError(`HTTP ${request.status}`));
       }
@@ -245,34 +248,62 @@ export default class UploadChunkFile {
     }
   }
 
-  // Process items in batches with retries
   private async processInBatches<TItem, TResult>(
     items: TItem[],
     processFn: (item: TItem) => Promise<TResult>
   ): Promise<TResult[]> {
-    const results: TResult[] = Array(items.length).fill(
-      undefined as unknown as TResult
-    );
+    const results: TResult[] = new Array(items.length);
 
-    const tasks = items.map(async (item, index) => {
-      for (
-        let attempt = 0;
-        attempt <= this.multipartOptions.maxRetries!;
-        attempt++
-      ) {
-        try {
-          results[index] = await processFn(item); // Process the item
-          break;
-        } catch (error) {
-          if (attempt === this.multipartOptions.maxRetries) {
-            throw error; // Fail after max retries
-          }
-          await delay(this.multipartOptions.retryDelay!); // Wait before retrying
+    const executeWithRetry = async (
+      func: () => Promise<TResult>,
+      retries: number
+    ): Promise<TResult> => {
+      try {
+        return await func();
+      } catch (error) {
+        if (error instanceof UploadAbortedError) {
+          throw error;
+        }
+        if (retries > 0) {
+          await delay(this.multipartOptions.retryDelay!);
+          return executeWithRetry(func, retries - 1);
+        } else {
+          throw error;
         }
       }
-    });
+    };
 
-    await Promise.all(tasks); // Wait for all tasks to complete
+    const semaphore = {
+      count: this.multipartOptions.maxParallel!,
+      async wait() {
+        // If we've reached our maximum concurrency, or it's the last item, wait
+        while (this.count <= 0) {
+          await delay(500);
+        }
+        this.count--;
+      },
+      signal() {
+        this.count++;
+      },
+    };
+
+    const tasks: Promise<void>[] = items.map((item, i) =>
+      (async () => {
+        await semaphore.wait();
+
+        try {
+          const result = await executeWithRetry(
+            () => processFn(item),
+            this.multipartOptions.maxRetries!
+          );
+          results[i] = result;
+        } finally {
+          semaphore.signal();
+        }
+      })()
+    );
+
+    await Promise.all(tasks);
     return results;
   }
 

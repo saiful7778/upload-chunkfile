@@ -9,7 +9,7 @@ export type UploadResponse<T> = {
 
 export type PayloadOptions = {
   chunkName?: string | undefined;
-  filename?: string | undefined;
+  fileName?: string | undefined;
   currentChunk?: string | undefined;
   totalChunk?: string | undefined;
 };
