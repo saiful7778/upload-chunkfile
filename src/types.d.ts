@@ -24,6 +24,5 @@ export type MultipartOptions = {
 export type Options = {
   method?: Method | undefined;
   uploadType?: UploadType | undefined;
-  signal?: AbortSignal | undefined;
   payloadOptions?: PayloadOptions | undefined;
 } & MultipartOptions;
