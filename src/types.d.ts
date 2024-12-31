@@ -1,7 +1,7 @@
 export type OnProgressChangeHandler = (progress: number) => void;
 
 export type Method = "POST" | "PUT" | "PATCH";
-export type UploadType = "multipart" | "single";
+export type UploadType = "multiple" | "single";
 
 export type UploadResponse<T> = {
   response: T;
