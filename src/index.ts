@@ -187,6 +187,7 @@ export default class UploadChunkFile {
     processFn: (item: TItem) => Promise<TResult>
   ): Promise<TResult> {
     let finalResult: Awaited<TResult>;
+    let retries = this.multipartOptions.maxRetries!;
 
     // Semaphore to control concurrency
     const semaphore = {
@@ -202,8 +203,7 @@ export default class UploadChunkFile {
 
     // Function to execute with retries
     const executeWithRetry = async (
-      func: () => Promise<TResult>,
-      retries: number
+      func: () => Promise<TResult>
     ): Promise<TResult> => {
       try {
         return await func();
@@ -213,7 +213,8 @@ export default class UploadChunkFile {
         }
         if (retries > 0) {
           await delay(this.multipartOptions.retryDelay!); // Delay before retry
-          return executeWithRetry(func, retries - 1); // Retry
+          return executeWithRetry(func); // Retry
+          retries -= 1;
         } else {
           throw error; // Throw error after max retries
         }
@@ -226,10 +227,7 @@ export default class UploadChunkFile {
         await semaphore.wait(); // Wait for concurrency slot
 
         try {
-          const result = await executeWithRetry(
-            () => processFn(item),
-            this.multipartOptions.maxRetries!
-          );
+          const result = await executeWithRetry(() => processFn(item));
           if (i === items.length - 1) {
             finalResult = result; // Store the final result
           }
