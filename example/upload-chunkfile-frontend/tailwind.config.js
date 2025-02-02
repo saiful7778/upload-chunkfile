@@ -53,6 +53,9 @@ export default {
           5: "hsl(var(--chart-5))",
         },
       },
+      animation: {
+        spinner: "spin 1500ms linear infinite",
+      },
     },
   },
   plugins: [tailwindcssAnimate],
